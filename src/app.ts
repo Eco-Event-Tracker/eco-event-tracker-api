@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import routes from './routes';
+import { healthCheck } from './controllers/health.controller';
 import { notFound } from './middlewares/not-found.middleware';
 import { errorHandler } from './middlewares/error.middleware';
 
@@ -13,6 +14,7 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 
+app.get('/health', healthCheck);
 app.use('/api', routes);
 
 app.use(notFound);
