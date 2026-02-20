@@ -1,23 +1,55 @@
-# EcoEvent Tracker API Server
+# Eco Event Tracker API - Foundation Only
 
-> A carbon footprint calculator for university events — like a fitness tracker, but for CO₂.
+TypeScript project foundation with:
 
-## What This API Does
+- clean folder structure
+- Sequelize models
+- plain SQL migration files (`up` and `down`)
+- Supabase/Postgres-ready environment template
 
-The EcoEvent Tracker API allows event organizers to submit event details and automatically calculates total CO₂ emissions.
+No API endpoints are included.
 
----
+## Structure
 
-## Inputs Collected
+```text
+src/
+  config/
+  models/
+  types/
+migrations/
+  001_init_up.sql
+  001_init_down.sql
+```
 
-- **Event Info**: name, date, location
-- **Attendance**: number of attendees, in-person/virtual/hybrid
-- **Energy Usage**: duration, equipment, kWh
-- **Catering**: meals served, type
-- **Travel**: distance, transport method
-- **Waste**: estimated waste generated
+## Setup
 
----
+1. Install dependencies:
 
-## Carbon Calculation Logic
+```bash
+npm install
+```
 
+2. Copy env file:
+
+```bash
+cp .env.example .env
+```
+
+3. Set `DATABASE_URL` in `.env`.
+
+4. Run migration up:
+
+```bash
+npm run db:migrate:up
+```
+
+5. Rollback all tables (if needed):
+
+```bash
+npm run db:migrate:down
+```
+
+## Notes
+
+- SQL migrations are plain `.sql` files and can be run directly with `psql`.
+- Models in `src/models` match the table schema.
