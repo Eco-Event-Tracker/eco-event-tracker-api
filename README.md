@@ -5,16 +5,20 @@ TypeScript project foundation with:
 - clean folder structure
 - Sequelize models
 - plain SQL migration files (`up` and `down`)
-- Supabase/Postgres-ready environment template
-
-No API endpoints are included.
+- Supabase-only environment template
+- minimal health API (`GET /api/health`)
 
 ## Structure
 
 ```text
 src/
+  app.ts
+  server.ts
   config/
+  controllers/
+  middlewares/
   models/
+  routes/
   types/
 migrations/
   001_init_up.sql
@@ -35,21 +39,21 @@ npm install
 cp .env.example .env
 ```
 
-3. Set `DATABASE_URL` in `.env`.
-
-4. Run migration up:
+3. Run API:
 
 ```bash
-npm run db:migrate:up
+npm run dev
 ```
 
-5. Rollback all tables (if needed):
+4. Test health endpoint:
 
 ```bash
-npm run db:migrate:down
+curl http://localhost:5000/api/health
 ```
 
-## Notes
+## Migrations (Supabase)
 
-- SQL migrations are plain `.sql` files and can be run directly with `psql`.
-- Models in `src/models` match the table schema.
+Run the SQL files in Supabase SQL Editor in this order:
+
+1. `migrations/001_init_up.sql`
+2. (rollback if needed) `migrations/001_init_down.sql`
