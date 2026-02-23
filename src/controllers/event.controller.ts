@@ -1,0 +1,29 @@
+import { Request, Response, NextFunction } from 'express';
+import { eventService } from '../services/event.service';
+import { CreateEventRequest } from '../types/events';
+
+export const createEvent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const createdBy = req.header('x-user-id') || '';
+    const payload = req.body as CreateEventRequest;
+
+    const result = await eventService.createEventWithEmissionData(payload, createdBy);
+
+    res.status(201).json({
+      id: result.event.id,
+      title: result.event.title,
+      location: result.event.location,
+      event_date: result.event.event_date,
+      attendance_count: result.event.attendance_count,
+      emission_data: {
+        energy_kwh: result.emissionData.energy_kwh,
+        travel_km: result.emissionData.travel_km,
+        catering_meals: result.emissionData.catering_meals,
+        waste_kg: result.emissionData.waste_kg,
+        total_co2: result.emissionData.total_co2
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
