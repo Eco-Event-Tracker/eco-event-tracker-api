@@ -1,6 +1,6 @@
 # Eco Event Tracker API
 
-Avaialable apis are documented in `./API.md`
+Available apis are documented in `./API.md`
 
 ## Setup
 
