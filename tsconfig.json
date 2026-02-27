@@ -10,6 +10,6 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "migrations/**/*.ts", "seeders/**/*.ts"],
+  "include": ["src/**/*.ts", "migrations/**/*.ts", "seeders/**/*.ts", "src/services/virtual-power"],
   "exclude": ["node_modules", "dist"]
 }
