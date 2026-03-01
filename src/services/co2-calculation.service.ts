@@ -26,7 +26,7 @@ class Co2CalculationService {
     const wasteCo2 = calculateWasteEmissions([{
       wasteType: "mixed",
       disposalMethod: "recycling",
-      quantityG: emissionData.waste_kg / 1_000,
+      quantityG: emissionData.waste_kg * 1_000,
     }]);
     const transportCo2 =
       emissionData.is_virtual || emissionData.participant_count <= 0
