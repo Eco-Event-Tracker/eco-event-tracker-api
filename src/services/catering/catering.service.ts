@@ -10,29 +10,32 @@
  *
  *   Diet type        kg CO2e/meal   Basis
  *   ─────────────────────────────────────────────────────────────────────────
- *   vegan            0.96           Scarborough et al. 2023 (Nature Food),
- *                                   n=55,504 UK adults. Daily vegan GHG =
- *                                   2.89 kg CO2e/day ÷ 3 meals/day.
- *   vegetarian       1.27           Scarborough et al. 2023. Daily =
+ *   vegan            0.96           Scarborough et al. 2014 (Climatic Change),
+ *                                   EPIC-Oxford cohort, n=55,504 UK adults.
+ *                                   Daily vegan GHG = 2.89 kg CO2e/day ÷ 3 meals/day.
+ *   vegetarian       1.27           Scarborough et al. 2014. Daily =
  *                                   3.81 kg CO2e/day ÷ 3.
- *   pescatarian      1.30           Scarborough et al. 2023. Daily =
+ *   pescatarian      1.30           Scarborough et al. 2014. Daily =
  *                                   3.91 kg CO2e/day ÷ 3.
- *   low_meat         1.56           Scarborough et al. 2023. Daily = 4.67 ÷ 3.
+ *   low_meat         1.56           Scarborough et al. 2014. Daily = 4.67 ÷ 3.
  *                                   (<50 g meat/day group)
- *   medium_meat      1.88           Scarborough et al. 2023. Daily = 5.63 ÷ 3.
+ *   medium_meat      1.88           Scarborough et al. 2014. Daily = 5.63 ÷ 3.
  *                                   (50–99 g/day group)
- *   high_meat        2.40           Scarborough et al. 2023. Daily = 7.19 ÷ 3.
+ *   high_meat        2.40           Scarborough et al. 2014. Daily = 7.19 ÷ 3.
  *                                   (≥100 g/day group)
  *
- *   Note on meal conversion: Scarborough et al. report whole-day dietary GHG.
- *   Dividing by 3 gives a per-meal proxy. For single-meal events (e.g. a gala
- *   dinner), this is appropriate. For half-day events with one meal + snacks,
- *   use meal + snack items separately.
+ *   Note on meal conversion: Scarborough et al. report whole-day dietary GHG,
+ *   standardised to a 2,000 kcal/day diet. Dividing by 3 gives a per-meal proxy.
+ *   For single-meal events (e.g. a gala dinner), this is appropriate. For
+ *   half-day events with one meal + snacks, use meal + snack items separately.
  *
- *   Reference: Scarborough, P. et al. "Vegans, vegetarians, fish-eaters and
- *   meat-eaters in the UK show discrepant environmental impacts."
- *   Nature Food 4, 565–574 (2023). https://doi.org/10.1038/s43016-023-00795-w
- *   (CC BY 4.0)
+ *   Reference: Scarborough, P. et al. "Dietary greenhouse gas emissions of
+ *   meat-eaters, fish-eaters, vegetarians and vegans in the UK."
+ *   Climatic Change 125(2), 179–192 (2014).
+ *   https://doi.org/10.1007/s10584-014-1169-1
+ *   (The per-day figures used here — 2.89 to 7.19 kg CO2e/day — are from this
+ *   2014 EPIC-Oxford study. Scarborough et al. 2023, Nature Food 4, 565–574,
+ *   is a separate later analysis reporting different, lower absolute values.)
  *
  * BEVERAGES (kg CO2e per serving):
  *
@@ -339,8 +342,8 @@ export function calculateCateringEmissions(
   }
 
   notes.push(
-    "Meal factors derived from Scarborough et al. 2023 (Nature Food, n=55,504), " +
-      "whole-day dietary GHG divided by 3 meals/day. Beverage factors: " +
+    "Meal factors derived from Scarborough et al. 2014 (Climatic Change, EPIC-Oxford, n=55,504), " +
+      "whole-day dietary GHG (per 2,000 kcal) divided by 3 meals/day. Beverage factors: " +
       "Twomey et al. 2021 / WWF Sweden 2022 / Circular Ecology LCA 2022. " +
       "Snack factors: Poore & Nemecek 2018 / Carbon Trust event catering estimates. " +
       "All factors cover farm-to-fork; on-site cooking energy excluded."
@@ -355,7 +358,7 @@ export function calculateCateringEmissions(
       snacks:    Math.round(snacksKgCO2e    * 1000) / 1000,
     },
     source:
-      "Scarborough et al. (2023) Nature Food (meals); " +
+      "Scarborough et al. (2014) Climatic Change (meals); " +
       "Poore & Nemecek (2018) Science (ingredients); " +
       "Circular Ecology / WWF Sweden (beverages); " +
       "GHG Protocol Scope 3 Category 1",

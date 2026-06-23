@@ -11,6 +11,7 @@ import TestTransportCalculation from './services/transport/transport.test';
 import TestPowerCalculation from './services/power/power.test';
 import TestVirtualPowerCalculation from './services/virtual-power/virual-power.test';
 import TestCateringCalculation from './services/catering/catering.test';
+import TestEstimateCalculation from './services/estimate/estimate.test';
 
 const app = express();
 
@@ -42,6 +43,11 @@ app.get('/test-virtual-power', (req, res) => {
 })
 app.get('/test-catering', (req, res) => {
   const result: string = TestCateringCalculation();
+  res.write(result);
+  res.end();
+})
+app.get('/test-estimate', (req, res) => {
+  const result: string = TestEstimateCalculation();
   res.write(result);
   res.end();
 })
