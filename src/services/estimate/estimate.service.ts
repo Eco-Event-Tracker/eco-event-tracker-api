@@ -31,6 +31,7 @@ import {
   EstimateResult,
   EstimateBreakdown,
   EstimateAction,
+  AudienceReach,
   CateringOption,
   PowerSourceOption,
 } from "../../types/estimate";
@@ -334,14 +335,18 @@ function buildTopActions(input: EstimateInput, baseTotal: number): EstimateActio
     });
   }
 
-  // Travel reach
-  if (
-    input.format !== "virtual" &&
-    (input.audience_reach === "national" || input.audience_reach === "international")
-  ) {
+  // Travel reach — pull the catchment one step closer to home
+  const reachStepCloser: Record<AudienceReach, AudienceReach | null> = {
+    international: "national",
+    national: "regional",
+    regional: "local",
+    local: null,
+  };
+  const closerReach = reachStepCloser[input.audience_reach ?? "local"];
+  if (input.format !== "virtual" && closerReach) {
     candidates.push({
-      action: "Prioritise local attendance / virtual options for distant guests",
-      variant: { ...input, audience_reach: "regional" },
+      action: "Draw a more local audience (or offer remote attendance)",
+      variant: { ...input, audience_reach: closerReach },
     });
   }
 
