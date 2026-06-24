@@ -1,13 +1,11 @@
+import { EstimateInput, EstimateResult } from './estimate';
+
 export interface CreateEventRequest {
   title: string;
   location: string;
   event_date: string;
-  participant_count: number;
-  is_virtual: boolean;
-  energy_kwh: number;
-  travel_km: number;
-  catering_meals: number;
-  waste_kg: number;
+  /** Planning-level inputs fed to the estimation engine. */
+  plan: EstimateInput;
 }
 
 export interface EventRow {
@@ -17,9 +15,27 @@ export interface EventRow {
   event_date: string;
   participant_count: number;
   is_virtual: boolean;
+  plan: EstimateInput | null;
+  estimated_co2: number;
   created_by: string;
   created_at: string;
 }
+
+export interface CreateEventResult {
+  event: EventRow;
+}
+
+export interface EventDetailsResponse {
+  title: string;
+  location: string;
+  event_date: string;
+  plan: EstimateInput;
+  estimate: EstimateResult;
+}
+
+// ---------------------------------------------------------------------------
+// Retained for the legacy co2-calculation.service (not used by the planning flow)
+// ---------------------------------------------------------------------------
 
 export interface EventEmissionDataRow {
   id: string;
@@ -32,38 +48,9 @@ export interface EventEmissionDataRow {
   created_at: string;
 }
 
-export interface CreateEventResult {
-  event: EventRow;
-  emissionData: EventEmissionDataRow;
-}
-
-export interface EmissionFactorRow {
-  id: string;
-  category: 'energy' | 'travel' | 'catering' | 'waste';
-  unit: string;
-  value: number;
-  created_at: string;
-}
-
-export interface EventWithEmissionAndFactors {
-  event: EventRow;
-  emissionData: EventEmissionDataRow;
-  factors: EmissionFactorRow[];
-}
-
 export interface EventEmissionBreakdown {
   energy: number;
   travel: number;
   catering: number;
   waste: number;
-}
-
-export interface EventDetailsResponse {
-  title: string;
-  location: string;
-  event_date: string;
-  participant_count: number;
-  is_virtual: boolean;
-  total_co2: number;
-  breakdown: EventEmissionBreakdown;
 }

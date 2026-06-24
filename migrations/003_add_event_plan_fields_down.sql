@@ -1,0 +1,5 @@
+ALTER TABLE events
+  DROP COLUMN IF EXISTS plan;
+
+ALTER TABLE events
+  DROP COLUMN IF EXISTS estimated_co2;

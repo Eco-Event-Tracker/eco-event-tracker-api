@@ -46,6 +46,17 @@ const WASTE_KG_PER_ATTENDEE = 0.5;
 /** For the "make it hybrid" what-if: share of attendees moved online. */
 const HYBRID_SHADOW_SHARE = 0.5;
 
+/** Accommodation: kg CO2e per attendee per hotel night. */
+const HOTEL_KG_PER_NIGHT = 20;
+
+/** Share of in-room attendees needing a hotel, by reach (locals commute home). */
+const STAY_SHARE_BY_REACH: Record<AudienceReach, number> = {
+  local: 0,
+  regional: 0.3,
+  national: 0.8,
+  international: 1.0,
+};
+
 /**
  * Menu leaning → diet mix. Shares sum to 1.0. These map a single planning
  * choice onto the per-diet meal factors already verified in catering.service.
@@ -155,6 +166,9 @@ function validateInput(input: EstimateInput): void {
   ) {
     throw err("online_attendance must be a non-negative integer");
   }
+  if (input.days !== undefined && (!Number.isInteger(input.days) || input.days < 1)) {
+    throw err("days must be a positive integer");
+  }
   const { inRoom, online } = resolveCounts(input);
   if (inRoom + online <= 0) {
     throw err("event must have at least one attendee (attendance or online_attendance)");
@@ -194,11 +208,13 @@ interface BaseComputation {
 function computeBase(input: EstimateInput): BaseComputation {
   const { inRoom, online } = resolveCounts(input);
   const duration = input.duration_hours;
+  const days = input.days && input.days >= 1 ? Math.floor(input.days) : 1;
   const powerSource = input.power_source ?? "grid";
   const reach = input.audience_reach ?? "local";
   const catering = input.catering ?? (inRoom > 0 ? "mixed" : "none");
   const disposal = input.waste_disposal ?? "landfill";
   const quality: VideoQuality = input.stream_quality === "sd" ? "sd" : "hd";
+  const dayLabel = days > 1 ? ` × ${days} days` : "";
 
   const assumptions: string[] = [];
   let energy = 0;
@@ -206,65 +222,80 @@ function computeBase(input: EstimateInput): BaseComputation {
   let cateringCo2 = 0;
   let waste = 0;
   let streaming = 0;
+  let accommodation = 0;
 
   const physical = inRoom > 0 && input.format !== "virtual";
 
-  // --- Venue power ---
+  // --- Venue power (per-day load × days) ---
   if (physical) {
     const power = calculatePowerEmissions(buildPowerEntries(powerSource, duration, inRoom));
-    energy = power.totalKgCO2e;
+    energy = power.totalKgCO2e * days;
     assumptions.push(
-      `Venue power: ${inRoom} attendees × ${duration} h on ${powerSourceLabel(powerSource)} ` +
-        `(~${power.totalKwh} kWh, load estimated from headcount). Source: ${power.source}`
+      `Venue power: ${inRoom} attendees × ${duration} h/day${dayLabel} on ${powerSourceLabel(powerSource)} ` +
+        `(~${round(power.totalKwh * days)} kWh, load estimated from headcount). Source: ${power.source}`
     );
   }
 
-  // --- Travel ---
+  // --- Travel (one round trip per attendee, independent of days) ---
   if (physical) {
     const t = estimateTransportEmissions(inRoom, { preset: reach as EventPreset });
     travel = t.totalKgCO2e;
     assumptions.push(
-      `Travel: ${inRoom} attendees, "${reach}" reach distance model. Source: ${t.source}`
+      `Travel: ${inRoom} attendees, "${reach}" reach distance model (one trip per attendee). Source: ${t.source}`
     );
   }
 
-  // --- Catering ---
+  // --- Accommodation (overnight stays for multi-day events) ---
+  const nights = Math.max(days - 1, 0);
+  if (physical && nights > 0) {
+    const guestsStaying = Math.round(inRoom * STAY_SHARE_BY_REACH[reach]);
+    accommodation = guestsStaying * nights * HOTEL_KG_PER_NIGHT;
+    if (guestsStaying > 0) {
+      assumptions.push(
+        `Accommodation: ~${guestsStaying} of ${inRoom} attendees × ${nights} night(s) ` +
+          `at ${HOTEL_KG_PER_NIGHT} kg CO2e/night (${reach} reach). ` +
+          `Source: Hotel Carbon Measurement Initiative (HCMI) / Cornell CHSB averages`
+      );
+    }
+  }
+
+  // --- Catering (per-day servings × days) ---
   if (inRoom > 0 && catering !== "none") {
     const items = buildCateringItems(catering, inRoom);
     if (items.length > 0) {
       const c = calculateCateringEmissions(items);
-      cateringCo2 = c.totalKgCO2e;
+      cateringCo2 = c.totalKgCO2e * days;
       assumptions.push(
-        `Catering: ${inRoom} servings, ${cateringLabel(catering)} menu. Source: ${c.source}`
+        `Catering: ${inRoom} servings/day${dayLabel}, ${cateringLabel(catering)} menu. Source: ${c.source}`
       );
     }
   } else if (inRoom > 0) {
     assumptions.push("Catering: none provided.");
   }
 
-  // --- Waste (quantity estimated from headcount) ---
+  // --- Waste (per attendee per day) ---
   if (inRoom > 0) {
-    const wasteKg = inRoom * WASTE_KG_PER_ATTENDEE;
+    const wasteKg = inRoom * WASTE_KG_PER_ATTENDEE * days;
     const w = calculateWasteEmissions([
       { wasteType: "mixed", disposalMethod: disposal, quantityG: wasteKg * 1000 },
     ]);
     waste = w.totalKgCO2e;
     assumptions.push(
-      `Waste: ~${round(wasteKg, 0)} kg estimated (${WASTE_KG_PER_ATTENDEE} kg/attendee), ${disposal}. ` +
+      `Waste: ~${round(wasteKg, 0)} kg estimated (${WASTE_KG_PER_ATTENDEE} kg/attendee/day${dayLabel}), ${disposal}. ` +
         `Source: ${w.source}`
     );
   }
 
-  // --- Streaming (online participants) ---
+  // --- Streaming (per-day × days) ---
   if (online > 0) {
     const v = calculateVirtualPowerEmissions({
       participantCount: online,
       durationHours: duration,
       quality,
     });
-    streaming = v.totalKgCO2e;
+    streaming = v.totalKgCO2e * days;
     assumptions.push(
-      `Streaming: ${online} online participants × ${duration} h, ${quality.toUpperCase()} quality. ` +
+      `Streaming: ${online} online participants × ${duration} h/day${dayLabel}, ${quality.toUpperCase()} quality. ` +
         `Source: ${v.source}`
     );
   }
@@ -275,8 +306,9 @@ function computeBase(input: EstimateInput): BaseComputation {
     catering: round(cateringCo2),
     waste: round(waste),
     streaming: round(streaming),
+    accommodation: round(accommodation),
   };
-  const total = round(energy + travel + cateringCo2 + waste + streaming);
+  const total = round(energy + travel + cateringCo2 + waste + streaming + accommodation);
 
   return { breakdown, total, assumptions, inRoom, online };
 }
@@ -347,6 +379,15 @@ function buildTopActions(input: EstimateInput, baseTotal: number): EstimateActio
     candidates.push({
       action: "Draw a more local audience (or offer remote attendance)",
       variant: { ...input, audience_reach: closerReach },
+    });
+  }
+
+  // Multi-day — trim the program by a day (cuts accommodation, catering, energy)
+  const days = input.days ?? 1;
+  if (days >= 2) {
+    candidates.push({
+      action: "Trim the program by one day",
+      variant: { ...input, days: days - 1 },
     });
   }
 

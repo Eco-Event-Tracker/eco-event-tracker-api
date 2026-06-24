@@ -21,8 +21,10 @@ export interface EstimateInput {
   attendance: number;
   /** Online participants (used for hybrid/virtual). */
   online_attendance?: number;
-  /** Event duration in hours. */
+  /** Event duration in hours per day. */
   duration_hours: number;
+  /** Number of event days. Defaults to 1. Drives accommodation and scales daily emissions. */
+  days?: number;
   /** Venue power source (physical formats). Defaults to grid. */
   power_source?: PowerSourceOption;
   /** Where in-room attendees travel from (physical formats). Defaults to local. */
@@ -41,6 +43,7 @@ export interface EstimateBreakdown {
   catering: number;
   waste: number;
   streaming: number;
+  accommodation: number;
 }
 
 export interface EstimateAction {

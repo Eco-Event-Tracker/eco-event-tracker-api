@@ -1,27 +1,15 @@
 import { eventRepository } from '../repositories/event.repository';
-import {
-  CreateEventRequest,
-  CreateEventResult,
-  EventDetailsResponse
-} from '../types/events';
-import { co2CalculationService } from './co2-calculation.service';
+import { CreateEventRequest, CreateEventResult, EventDetailsResponse } from '../types/events';
+import { EstimateInput } from '../types/estimate';
+import { estimateEventEmissions } from './estimate/estimate.service';
 
 const isValidDate = (value: string) => !Number.isNaN(Date.parse(value));
 
-const asNumber = (value: unknown) => (typeof value === 'number' ? value : Number(value));
-const asBoolean = (value: unknown) => {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
-  }
-  return undefined;
-};
-
 export class EventService {
-  private validateCreateEventPayload(input: CreateEventRequest) {
+  async createEvent(input: CreateEventRequest, createdBy: string): Promise<CreateEventResult> {
+    if (!createdBy?.trim()) {
+      throw Object.assign(new Error('x-user-id header is required'), { statusCode: 400 });
+    }
     if (!input.title?.trim()) {
       throw Object.assign(new Error('title is required'), { statusCode: 400 });
     }
@@ -31,103 +19,51 @@ export class EventService {
     if (!input.event_date || !isValidDate(input.event_date)) {
       throw Object.assign(new Error('event_date must be a valid date'), { statusCode: 400 });
     }
-
-    const participantCountInput =
-      input.participant_count ?? (input as unknown as { attendance_count?: unknown }).attendance_count;
-    const participantCount = asNumber(participantCountInput);
-    const isVirtual = asBoolean(input.is_virtual);
-    const energyKwh = asNumber(input.energy_kwh);
-    const travelKm = asNumber(input.travel_km);
-    const cateringMeals = asNumber(input.catering_meals);
-    const wasteKg = asNumber(input.waste_kg);
-
-    if (!Number.isInteger(participantCount) || participantCount < 0) {
-      throw Object.assign(new Error('participant_count must be a non-negative integer'), { statusCode: 400 });
-    }
-    if (input.is_virtual !== undefined && typeof isVirtual !== 'boolean') {
-      throw Object.assign(new Error('is_virtual must be a boolean'), { statusCode: 400 });
-    }
-    if (!Number.isFinite(energyKwh) || energyKwh < 0) {
-      throw Object.assign(new Error('energy_kwh must be a non-negative number'), { statusCode: 400 });
-    }
-    if (!Number.isFinite(travelKm) || travelKm < 0) {
-      throw Object.assign(new Error('travel_km must be a non-negative number'), { statusCode: 400 });
-    }
-    if (!Number.isInteger(cateringMeals) || cateringMeals < 0) {
-      throw Object.assign(new Error('catering_meals must be a non-negative integer'), { statusCode: 400 });
-    }
-    if (!Number.isFinite(wasteKg) || wasteKg < 0) {
-      throw Object.assign(new Error('waste_kg must be a non-negative number'), { statusCode: 400 });
-    }
-  }
-
-  async createEventWithEmissionData(input: CreateEventRequest, createdBy: string): Promise<CreateEventResult> {
-    if (!createdBy?.trim()) {
-      throw Object.assign(new Error('x-user-id header is required'), { statusCode: 400 });
+    if (!input.plan || typeof input.plan !== 'object') {
+      throw Object.assign(new Error('plan is required'), { statusCode: 400 });
     }
 
-    this.validateCreateEventPayload(input);
+    // estimateEventEmissions validates the plan and throws a 400 on bad inputs.
+    const estimate = estimateEventEmissions(input.plan);
+    const plan = input.plan;
 
-    const participantCountInput =
-      input.participant_count ?? (input as unknown as { attendance_count?: unknown }).attendance_count;
-    const participantCount = asNumber(participantCountInput);
-    const isVirtual = asBoolean(input.is_virtual) ?? false;
-
-    return eventRepository.createEventWithEmissionData(
+    return eventRepository.createEvent(
       {
         title: input.title.trim(),
         location: input.location.trim(),
         event_date: input.event_date,
-        participant_count: participantCount,
-        is_virtual: isVirtual,
-        energy_kwh: asNumber(input.energy_kwh),
-        travel_km: asNumber(input.travel_km),
-        catering_meals: asNumber(input.catering_meals),
-        waste_kg: asNumber(input.waste_kg)
+        participant_count: plan.attendance ?? 0,
+        is_virtual: plan.format === 'virtual',
+        plan,
+        estimated_co2: estimate.total
       },
       createdBy
     );
   }
 
-  async getEventDetailsWithCalculatedCo2(eventId: string): Promise<EventDetailsResponse> {
+  async getEventDetails(eventId: string): Promise<EventDetailsResponse> {
     if (!eventId?.trim()) {
       throw Object.assign(new Error('eventId is required'), { statusCode: 400 });
     }
 
-    const result = await eventRepository.getEventWithEmissionAndFactors(eventId);
-
-    if (!result) {
+    const event = await eventRepository.getEventById(eventId);
+    if (!event) {
       throw Object.assign(new Error('Event not found'), { statusCode: 404 });
     }
+    if (!event.plan) {
+      throw Object.assign(new Error('Event has no plan data'), { statusCode: 422 });
+    }
 
-    const emissionResult = await co2CalculationService.calculate({
-      ...result.emissionData,
-      participant_count: result.event.participant_count,
-      is_virtual: result.event.is_virtual
-    });
+    const plan = event.plan as EstimateInput;
+    const estimate = estimateEventEmissions(plan);
 
     return {
-      title: result.event.title,
-      location: result.event.location,
-      event_date: result.event.event_date,
-      participant_count: result.event.participant_count,
-      is_virtual: result.event.is_virtual,
-      total_co2: emissionResult.total_co2,
-      breakdown: emissionResult.breakdown
+      title: event.title,
+      location: event.location,
+      event_date: event.event_date,
+      plan,
+      estimate
     };
-  }
-
-  async getEventOrThrow(eventId: string) {
-    if (!eventId?.trim()) {
-      throw Object.assign(new Error('eventId is required'), { statusCode: 400 });
-    }
-
-    const result = await eventRepository.getEventWithEmissionAndFactors(eventId);
-    if (!result) {
-      throw Object.assign(new Error('Event not found'), { statusCode: 404 });
-    }
-
-    return result;
   }
 }
 

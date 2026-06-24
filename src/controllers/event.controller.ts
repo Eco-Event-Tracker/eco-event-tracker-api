@@ -8,7 +8,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
     const createdBy = req.header('x-user-id') || '';
     const payload = req.body as CreateEventRequest;
 
-    const result = await eventService.createEventWithEmissionData(payload, createdBy);
+    const result = await eventService.createEvent(payload, createdBy);
 
     res.status(201).json({
       id: result.event.id,
@@ -17,13 +17,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
       event_date: result.event.event_date,
       participant_count: result.event.participant_count,
       is_virtual: result.event.is_virtual,
-      emission_data: {
-        energy_kwh: result.emissionData.energy_kwh,
-        travel_km: result.emissionData.travel_km,
-        catering_meals: result.emissionData.catering_meals,
-        waste_kg: result.emissionData.waste_kg,
-        total_co2: result.emissionData.total_co2
-      }
+      estimated_co2: result.event.estimated_co2
     });
   } catch (error) {
     next(error);
@@ -33,7 +27,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
 export const getEventDetails = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { eventId } = req.params;
-    const result = await eventService.getEventDetailsWithCalculatedCo2(eventId);
+    const result = await eventService.getEventDetails(eventId);
     res.status(200).json(result);
   } catch (error) {
     next(error);

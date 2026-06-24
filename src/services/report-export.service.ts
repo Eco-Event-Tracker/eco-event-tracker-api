@@ -12,20 +12,31 @@ const escapeCsv = (value: string | number | boolean) => {
 
 const COL = {
   header: '#1565C0',
-  headerAccent: '#42A5F5',
   cardBg: '#E3F2FD',
   totalText: '#0D47A1',
   muted: '#546E7A',
   border: '#B0BEC5',
-  rowAlt: '#F5F9FC',
-  barEnergy: '#FF8F00',
-  barTravel: '#6A1B9A',
-  barCatering: '#C62828',
-  barWaste: '#2E7D32'
+  rowAlt: '#F5F9FC'
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Travel: '#6A1B9A',
+  Accommodation: '#00838F',
+  Catering: '#C62828',
+  Energy: '#FF8F00',
+  Waste: '#2E7D32',
+  Streaming: '#1565C0'
 };
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(n);
+
+function formatLabelFromPlan(format: string): string {
+  if (format === 'in_person') return 'In person';
+  if (format === 'hybrid') return 'Hybrid';
+  if (format === 'virtual') return 'Virtual';
+  return format.replace(/_/g, ' ');
+}
 
 function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -38,14 +49,20 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
     const pageW = doc.page.width;
     const margin = 48;
     const innerW = pageW - margin * 2;
-    const { breakdown, total_co2: total } = d;
+
+    const { breakdown, total } = d.estimate;
     const parts = [
-      { label: 'Energy', value: breakdown.energy, color: COL.barEnergy },
-      { label: 'Travel', value: breakdown.travel, color: COL.barTravel },
-      { label: 'Catering', value: breakdown.catering, color: COL.barCatering },
-      { label: 'Waste', value: breakdown.waste, color: COL.barWaste }
-    ];
+      { label: 'Travel', value: breakdown.travel },
+      { label: 'Accommodation', value: breakdown.accommodation },
+      { label: 'Catering', value: breakdown.catering },
+      { label: 'Energy', value: breakdown.energy },
+      { label: 'Waste', value: breakdown.waste },
+      { label: 'Streaming', value: breakdown.streaming }
+    ].filter((p) => p.value > 0);
     const safeTotal = total > 0 ? total : 1;
+
+    const people = (d.plan.attendance ?? 0) + (d.plan.online_attendance ?? 0);
+    const formatLabel = formatLabelFromPlan(d.plan.format);
 
     const topR = 14;
     const topBandH = 66;
@@ -64,7 +81,7 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
     doc.fillColor('#212121').font('Helvetica-Bold').fontSize(20).text(d.title, margin, bodyTop, { width: innerW });
     doc.font('Helvetica').fontSize(10).fillColor(COL.muted);
     doc.text(
-      `${d.event_date}  ·  ${d.location}  ·  ${d.participant_count} participants  ·  ${d.is_virtual ? 'Virtual' : 'In person'}`,
+      `${d.event_date}  ·  ${d.location}  ·  ${people} attendees  ·  ${formatLabel}`,
       margin,
       bodyTop + 26,
       { width: innerW }
@@ -79,7 +96,6 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
     const sectionTitleY = cardY + 98;
     doc.fillColor('#212121').font('Helvetica-Bold').fontSize(13).text('Breakdown by category', margin, sectionTitleY);
 
-    // --- Table: single grid (same x/width/align for header + cells) ---
     const pad = 14;
     const gap = 10;
     const wKg = 78;
@@ -102,8 +118,6 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
 
     doc.roundedRect(margin, tableTop, innerW, tableH, tableR).fill('#FFFFFF');
     doc.roundedRect(margin, tableTop, innerW, tableH, tableR).stroke(COL.border);
-
-    // Header row background (inset so it respects outer rounding)
     doc.rect(margin + 2, tableTop + 2, innerW - 4, headerH - 2).fill('#ECEFF1');
 
     const fsH = 9;
@@ -134,7 +148,7 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
       const bw = Math.max(0, (p.value / safeTotal) * wBar);
       doc.roundedRect(xBar, barY, wBar, barH, 6).fill('#ECEFF1');
       if (bw > 0.5) {
-        doc.roundedRect(xBar, barY, bw, barH, 6).fill(p.color);
+        doc.roundedRect(xBar, barY, bw, barH, 6).fill(CATEGORY_COLORS[p.label] || COL.header);
       }
 
       y += rowH;
@@ -142,7 +156,7 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
 
     y = tableTop + tableH + 12;
     doc.font('Helvetica').fontSize(8).fillColor(COL.muted).text(
-      'Figures are estimates from your inputs and configured emission factors.',
+      'Figures are decision-grade estimates from your inputs (DEFRA 2024, IEA, peer-reviewed factors).',
       margin,
       y,
       { width: innerW, align: 'center' }
@@ -154,20 +168,25 @@ function buildEventReportPdf(d: EventDetailsResponse): Promise<Buffer> {
 
 export class ReportExportService {
   async exportByEventId(eventId: string, format: 'csv' | 'pdf') {
-    const details = await eventService.getEventDetailsWithCalculatedCo2(eventId);
+    const details = await eventService.getEventDetails(eventId);
+    const { breakdown, total } = details.estimate;
 
     if (format === 'csv') {
-      const rows = [
+      const rows: Array<[string, string | number | boolean]> = [
         ['title', details.title],
         ['location', details.location],
         ['event_date', details.event_date],
-        ['participant_count', details.participant_count],
-        ['is_virtual', details.is_virtual],
-        ['total_co2', details.total_co2],
-        ['breakdown_energy', details.breakdown.energy],
-        ['breakdown_travel', details.breakdown.travel],
-        ['breakdown_catering', details.breakdown.catering],
-        ['breakdown_waste', details.breakdown.waste]
+        ['format', details.plan.format],
+        ['attendance', details.plan.attendance ?? 0],
+        ['online_attendance', details.plan.online_attendance ?? 0],
+        ['days', details.plan.days ?? 1],
+        ['total_co2', total],
+        ['breakdown_travel', breakdown.travel],
+        ['breakdown_accommodation', breakdown.accommodation],
+        ['breakdown_catering', breakdown.catering],
+        ['breakdown_energy', breakdown.energy],
+        ['breakdown_waste', breakdown.waste],
+        ['breakdown_streaming', breakdown.streaming]
       ];
 
       const content = rows.map(([key, value]) => `${escapeCsv(key)},${escapeCsv(value)}`).join('\n');
