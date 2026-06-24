@@ -14,6 +14,10 @@ Base URL: `/api`
   - response: `{ user, token }`
 
 ## Events
+- `GET /events`
+  - header: `x-user-id: <user_uuid>`
+  - lists events created by the user, newest first
+  - response: `{ "events": [{ id, title, location, event_date, participant_count, is_virtual, estimated_co2, created_at }] }`
 - `POST /events`
   - header: `x-user-id: <user_uuid>`
   - body:
@@ -22,16 +26,15 @@ Base URL: `/api`
     "title": "string",
     "location": "string",
     "event_date": "YYYY-MM-DD",
-    "participant_count": 0,
-    "is_virtual": false,
-    "energy_kwh": 0,
-    "travel_km": 0,
-    "catering_meals": 0,
-    "waste_kg": 0
+    "plan": { "...estimation inputs..." }
   }
   ```
 - `GET /events/:eventId`
-  - response: `{ title, location, event_date, participant_count, is_virtual, total_co2, breakdown }`
+  - response: `{ title, location, event_date, plan, estimate }`
+- `DELETE /events/:eventId`
+  - header: `x-user-id: <user_uuid>`
+  - deletes the event if it belongs to the user; `404` otherwise
+  - response: `{ "id": "<eventId>" }`
 - `GET /events/:eventId/report?format=pdf|csv`
   - downloads emission report file
   - default format: `pdf` (`format=csv` for spreadsheet export)

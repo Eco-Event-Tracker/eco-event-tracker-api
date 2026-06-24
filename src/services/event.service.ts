@@ -1,5 +1,5 @@
 import { eventRepository } from '../repositories/event.repository';
-import { CreateEventRequest, CreateEventResult, EventDetailsResponse } from '../types/events';
+import { CreateEventRequest, CreateEventResult, EventDetailsResponse, EventSummary } from '../types/events';
 import { EstimateInput } from '../types/estimate';
 import { estimateEventEmissions } from './estimate/estimate.service';
 
@@ -39,6 +39,39 @@ export class EventService {
       },
       createdBy
     );
+  }
+
+  async listEvents(createdBy: string): Promise<EventSummary[]> {
+    if (!createdBy?.trim()) {
+      throw Object.assign(new Error('x-user-id header is required'), { statusCode: 400 });
+    }
+
+    const events = await eventRepository.listEventsByUser(createdBy.trim());
+
+    return events.map((event) => ({
+      id: event.id,
+      title: event.title,
+      location: event.location,
+      event_date: event.event_date,
+      participant_count: event.participant_count,
+      is_virtual: event.is_virtual,
+      estimated_co2: event.estimated_co2,
+      created_at: event.created_at
+    }));
+  }
+
+  async deleteEvent(eventId: string, createdBy: string): Promise<void> {
+    if (!createdBy?.trim()) {
+      throw Object.assign(new Error('x-user-id header is required'), { statusCode: 400 });
+    }
+    if (!eventId?.trim()) {
+      throw Object.assign(new Error('eventId is required'), { statusCode: 400 });
+    }
+
+    const deleted = await eventRepository.deleteEvent(eventId, createdBy.trim());
+    if (!deleted) {
+      throw Object.assign(new Error('Event not found'), { statusCode: 404 });
+    }
   }
 
   async getEventDetails(eventId: string): Promise<EventDetailsResponse> {

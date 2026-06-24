@@ -24,6 +24,27 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const listEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const createdBy = req.header('x-user-id') || '';
+    const events = await eventService.listEvents(createdBy);
+    res.status(200).json({ events });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteEvent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const createdBy = req.header('x-user-id') || '';
+    const { eventId } = req.params;
+    await eventService.deleteEvent(eventId, createdBy);
+    res.status(200).json({ id: eventId });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getEventDetails = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { eventId } = req.params;

@@ -25,6 +25,18 @@ export interface CreateEventResult {
   event: EventRow;
 }
 
+/** Lightweight event shape returned by the list endpoint for the dashboard. */
+export interface EventSummary {
+  id: string;
+  title: string;
+  location: string;
+  event_date: string;
+  participant_count: number;
+  is_virtual: boolean;
+  estimated_co2: number;
+  created_at: string;
+}
+
 export interface EventDetailsResponse {
   title: string;
   location: string;
