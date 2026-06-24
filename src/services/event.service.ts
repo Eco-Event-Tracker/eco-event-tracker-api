@@ -1,9 +1,31 @@
 import { eventRepository } from '../repositories/event.repository';
-import { CreateEventRequest, CreateEventResult, EventDetailsResponse, EventSummary } from '../types/events';
+import {
+  CreateEventRequest,
+  CreateEventResult,
+  EventDetails,
+  EventDetailsResponse,
+  EventSummary
+} from '../types/events';
 import { EstimateInput } from '../types/estimate';
 import { estimateEventEmissions } from './estimate/estimate.service';
 
 const isValidDate = (value: string) => !Number.isNaN(Date.parse(value));
+
+/** Keep only known descriptive fields, trimmed; returns null when nothing useful is provided. */
+const sanitizeDetails = (details: EventDetails | undefined): EventDetails | null => {
+  if (!details || typeof details !== 'object') {
+    return null;
+  }
+
+  const description = typeof details.description === 'string' ? details.description.trim() : '';
+  const category = typeof details.category === 'string' ? details.category.trim() : '';
+
+  const clean: EventDetails = {};
+  if (description) clean.description = description;
+  if (category) clean.category = category;
+
+  return Object.keys(clean).length > 0 ? clean : null;
+};
 
 export class EventService {
   async createEvent(input: CreateEventRequest, createdBy: string): Promise<CreateEventResult> {
@@ -35,6 +57,7 @@ export class EventService {
         participant_count: plan.attendance ?? 0,
         is_virtual: plan.format === 'virtual',
         plan,
+        details: sanitizeDetails(input.details),
         estimated_co2: estimate.total
       },
       createdBy
@@ -56,6 +79,7 @@ export class EventService {
       participant_count: event.participant_count,
       is_virtual: event.is_virtual,
       estimated_co2: event.estimated_co2,
+      category: event.details?.category,
       created_at: event.created_at
     }));
   }
@@ -95,6 +119,7 @@ export class EventService {
       location: event.location,
       event_date: event.event_date,
       plan,
+      details: event.details ?? {},
       estimate
     };
   }

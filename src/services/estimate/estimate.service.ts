@@ -138,6 +138,22 @@ function buildPowerEntries(source: PowerSourceOption, durationHours: number, inR
   return [{ source: map[source], durationHours, participantCount: inRoom }];
 }
 
+function buildPowerEntriesFromKwh(source: PowerSourceOption, totalKwh: number): PowerEntry[] {
+  if (source === "mixed") {
+    // Split a measured total evenly across the grid + generator mix.
+    return [
+      { source: "grid_electricity", totalKwh: totalKwh / 2 },
+      { source: "diesel_generator", totalKwh: totalKwh / 2 },
+    ];
+  }
+  const map: Record<Exclude<PowerSourceOption, "mixed">, PowerSource> = {
+    grid: "grid_electricity",
+    generator: "diesel_generator",
+    solar: "solar",
+  };
+  return [{ source: map[source], totalKwh }];
+}
+
 function buildCateringItems(option: CateringOption, servings: number): CateringItem[] {
   if (option === "none" || servings <= 0) return [];
   return DIET_PROFILES[option]
@@ -191,6 +207,15 @@ function validateInput(input: EstimateInput): void {
   if (input.stream_quality && !["sd", "hd"].includes(input.stream_quality)) {
     throw err("invalid stream_quality");
   }
+  if (input.energy_kwh !== undefined && (!Number.isFinite(input.energy_kwh) || input.energy_kwh < 0)) {
+    throw err("energy_kwh must be a non-negative number");
+  }
+  if (input.waste_kg !== undefined && (!Number.isFinite(input.waste_kg) || input.waste_kg < 0)) {
+    throw err("waste_kg must be a non-negative number");
+  }
+  if (input.meals_served !== undefined && (!Number.isInteger(input.meals_served) || input.meals_served < 0)) {
+    throw err("meals_served must be a non-negative integer");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,14 +251,22 @@ function computeBase(input: EstimateInput): BaseComputation {
 
   const physical = inRoom > 0 && input.format !== "virtual";
 
-  // --- Venue power (per-day load × days) ---
+  // --- Venue power (measured kWh if provided, else per-day load × days) ---
   if (physical) {
-    const power = calculatePowerEmissions(buildPowerEntries(powerSource, duration, inRoom));
-    energy = power.totalKgCO2e * days;
-    assumptions.push(
-      `Venue power: ${inRoom} attendees × ${duration} h/day${dayLabel} on ${powerSourceLabel(powerSource)} ` +
-        `(~${round(power.totalKwh * days)} kWh, load estimated from headcount). Source: ${power.source}`
-    );
+    if (input.energy_kwh !== undefined) {
+      const power = calculatePowerEmissions(buildPowerEntriesFromKwh(powerSource, input.energy_kwh));
+      energy = power.totalKgCO2e;
+      assumptions.push(
+        `Venue power: ${round(input.energy_kwh)} kWh measured on ${powerSourceLabel(powerSource)}. Source: ${power.source}`
+      );
+    } else {
+      const power = calculatePowerEmissions(buildPowerEntries(powerSource, duration, inRoom));
+      energy = power.totalKgCO2e * days;
+      assumptions.push(
+        `Venue power: ${inRoom} attendees × ${duration} h/day${dayLabel} on ${powerSourceLabel(powerSource)} ` +
+          `(~${round(power.totalKwh * days)} kWh, load estimated from headcount). Source: ${power.source}`
+      );
+    }
   }
 
   // --- Travel (one round trip per attendee, independent of days) ---
@@ -259,31 +292,40 @@ function computeBase(input: EstimateInput): BaseComputation {
     }
   }
 
-  // --- Catering (per-day servings × days) ---
+  // --- Catering (actual meals served if provided, else per-day servings × days) ---
   if (inRoom > 0 && catering !== "none") {
-    const items = buildCateringItems(catering, inRoom);
+    const measuredMeals = input.meals_served;
+    const servings = measuredMeals !== undefined ? measuredMeals : inRoom;
+    const items = buildCateringItems(catering, servings);
     if (items.length > 0) {
       const c = calculateCateringEmissions(items);
-      cateringCo2 = c.totalKgCO2e * days;
+      cateringCo2 = measuredMeals !== undefined ? c.totalKgCO2e : c.totalKgCO2e * days;
       assumptions.push(
-        `Catering: ${inRoom} servings/day${dayLabel}, ${cateringLabel(catering)} menu. Source: ${c.source}`
+        measuredMeals !== undefined
+          ? `Catering: ${measuredMeals} meals served (actual), ${cateringLabel(catering)} menu. Source: ${c.source}`
+          : `Catering: ${inRoom} servings/day${dayLabel}, ${cateringLabel(catering)} menu. Source: ${c.source}`
       );
     }
   } else if (inRoom > 0) {
     assumptions.push("Catering: none provided.");
   }
 
-  // --- Waste (per attendee per day) ---
+  // --- Waste (measured kg if provided, else per attendee per day) ---
   if (inRoom > 0) {
-    const wasteKg = inRoom * WASTE_KG_PER_ATTENDEE * days;
-    const w = calculateWasteEmissions([
-      { wasteType: "mixed", disposalMethod: disposal, quantityG: wasteKg * 1000 },
-    ]);
-    waste = w.totalKgCO2e;
-    assumptions.push(
-      `Waste: ~${round(wasteKg, 0)} kg estimated (${WASTE_KG_PER_ATTENDEE} kg/attendee/day${dayLabel}), ${disposal}. ` +
-        `Source: ${w.source}`
-    );
+    const measuredWaste = input.waste_kg;
+    const wasteKg = measuredWaste !== undefined ? measuredWaste : inRoom * WASTE_KG_PER_ATTENDEE * days;
+    if (wasteKg > 0) {
+      const w = calculateWasteEmissions([
+        { wasteType: "mixed", disposalMethod: disposal, quantityG: wasteKg * 1000 },
+      ]);
+      waste = w.totalKgCO2e;
+      assumptions.push(
+        measuredWaste !== undefined
+          ? `Waste: ${round(measuredWaste, 0)} kg measured, ${disposal}. Source: ${w.source}`
+          : `Waste: ~${round(wasteKg, 0)} kg estimated (${WASTE_KG_PER_ATTENDEE} kg/attendee/day${dayLabel}), ${disposal}. ` +
+              `Source: ${w.source}`
+      );
+    }
   }
 
   // --- Streaming (per-day × days) ---

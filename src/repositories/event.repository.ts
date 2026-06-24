@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabase';
-import { CreateEventResult, EventRow } from '../types/events';
+import { CreateEventResult, EventDetails, EventRow } from '../types/events';
 import { EstimateInput } from '../types/estimate';
 
 interface CreateEventInsert {
@@ -9,6 +9,7 @@ interface CreateEventInsert {
   participant_count: number;
   is_virtual: boolean;
   plan: EstimateInput;
+  details: EventDetails | null;
   estimated_co2: number;
 }
 
@@ -23,6 +24,7 @@ export class EventRepository {
         participant_count: input.participant_count,
         is_virtual: input.is_virtual,
         plan: input.plan,
+        details: input.details,
         estimated_co2: input.estimated_co2,
         created_by: createdBy
       })

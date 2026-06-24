@@ -26,11 +26,21 @@ Base URL: `/api`
     "title": "string",
     "location": "string",
     "event_date": "YYYY-MM-DD",
-    "plan": { "...estimation inputs..." }
+    "plan": {
+      "format": "in_person|hybrid|virtual",
+      "attendance": 0,
+      "duration_hours": 0,
+      "...other planning levers...": "",
+      "energy_kwh": 0,
+      "waste_kg": 0,
+      "meals_served": 0
+    },
+    "details": { "description": "string", "category": "string" }
   }
   ```
+  - `energy_kwh` / `waste_kg` / `meals_served` are optional measured actuals; when present they override the headcount-based estimates. `details` is optional descriptive metadata.
 - `GET /events/:eventId`
-  - response: `{ title, location, event_date, plan, estimate }`
+  - response: `{ title, location, event_date, plan, details, estimate }`
 - `DELETE /events/:eventId`
   - header: `x-user-id: <user_uuid>`
   - deletes the event if it belongs to the user; `404` otherwise

@@ -35,6 +35,18 @@ export interface EstimateInput {
   waste_disposal?: WasteDisposalOption;
   /** Streaming quality for online participants. Defaults to HD. */
   stream_quality?: StreamQuality;
+
+  // --- Measured actuals (hindsight) ---
+  // Optional. When recording a past event, organizers often know real numbers.
+  // Each override replaces the corresponding headcount-based estimate. They are
+  // event totals (already across all days), not per-day figures.
+
+  /** Measured venue electricity for the whole event, in kWh (from meter/invoice/fuel). */
+  energy_kwh?: number;
+  /** Measured total waste generated for the whole event, in kg. */
+  waste_kg?: number;
+  /** Actual number of meals served across the whole event. */
+  meals_served?: number;
 }
 
 export interface EstimateBreakdown {

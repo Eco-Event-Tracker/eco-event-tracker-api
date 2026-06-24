@@ -1,11 +1,19 @@
 import { EstimateInput, EstimateResult } from './estimate';
 
+/** Optional descriptive metadata that does not affect the estimate. */
+export interface EventDetails {
+  description?: string;
+  category?: string;
+}
+
 export interface CreateEventRequest {
   title: string;
   location: string;
   event_date: string;
   /** Planning-level inputs fed to the estimation engine. */
   plan: EstimateInput;
+  /** Optional descriptive metadata (description, category). */
+  details?: EventDetails;
 }
 
 export interface EventRow {
@@ -16,6 +24,7 @@ export interface EventRow {
   participant_count: number;
   is_virtual: boolean;
   plan: EstimateInput | null;
+  details: EventDetails | null;
   estimated_co2: number;
   created_by: string;
   created_at: string;
@@ -34,6 +43,7 @@ export interface EventSummary {
   participant_count: number;
   is_virtual: boolean;
   estimated_co2: number;
+  category?: string;
   created_at: string;
 }
 
@@ -42,6 +52,7 @@ export interface EventDetailsResponse {
   location: string;
   event_date: string;
   plan: EstimateInput;
+  details: EventDetails;
   estimate: EstimateResult;
 }
 
